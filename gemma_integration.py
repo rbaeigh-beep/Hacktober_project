@@ -13,7 +13,7 @@ def ask_gemma(prompt_text):
     try:
         client = genai.Client()
         response = client.models.generate_content(
-            model="gemma-4-26b-a4b-it", 
+            model="gemma-4-e2b-instruct", 
             contents=prompt_text
         )
         return response.text
