@@ -18,4 +18,4 @@ def ask_gemma(prompt_text):
         )
         return response.text
     except Exception as e:
-        return f"❌ Gemma Error: {e}"
+        return f" Gemma Error: {e}"
