@@ -2,7 +2,6 @@ import os
 from dotenv import load_dotenv
 from google import genai
 
-# Load environment variables from your local hidden .env file
 load_dotenv()
 
 def ask_gemma(prompt_text):
