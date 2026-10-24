@@ -3,7 +3,7 @@ import json
 import math
 import requests
 from flask import Flask, jsonify, request, render_template
-from gemma_integration import ask_gemma  # Teammate's original function!
+from gemma_integration import ask_gemma  # Teammate's integration function!
 
 app = Flask(__name__, template_folder='.')
 
@@ -12,9 +12,12 @@ app = Flask(__name__, template_folder='.')
 # -------------------------------------------------------------
 
 def parse_time_to_minutes(time_str):
-    """Parses time strings like '07:00 PM' into minutes from midnight for chronological sorting."""
+    """Parses time strings like '02:00 PM - 05:00 PM' into start-minutes from midnight for sorting."""
     try:
         clean_time = str(time_str).strip().upper()
+        if "-" in clean_time:
+            clean_time = clean_time.split("-")[0].strip()
+            
         dt = datetime.strptime(clean_time, "%I:%M %p")
         return dt.hour * 60 + dt.minute
     except ValueError:
@@ -47,7 +50,7 @@ def get_real_coordinates(place_name, address):
     Queries OpenStreetMap (Nominatim) using fallback strategies to replace hallucinated 
     coordinates with real physical lat/lng values.
     """
-    headers = {'User-Agent': 'SheetMapHackathonApp/1.0'}
+    headers = {'User-Agent': 'SpookySheetMapHackathonApp/1.0'}
     
     # Strategy 1: Search by Name + Address
     try:
@@ -59,9 +62,9 @@ def get_real_coordinates(place_name, address):
     except Exception:
         pass
 
-    # Strategy 2: Search by Name + City
+    # Strategy 2: Search by Name
     try:
-        query = f"{place_name}, London"
+        query = f"{place_name}"
         url = f"https://nominatim.openstreetmap.org/search?format=json&q={requests.utils.quote(query)}"
         res = requests.get(url, headers=headers, timeout=3).json()
         if res:
@@ -69,7 +72,7 @@ def get_real_coordinates(place_name, address):
     except Exception:
         pass
 
-    # Strategy 3: Fall back to searching address landmark
+    # Strategy 3: Search by Address
     try:
         query = f"{address}"
         url = f"https://nominatim.openstreetmap.org/search?format=json&q={requests.utils.quote(query)}"
@@ -83,24 +86,31 @@ def get_real_coordinates(place_name, address):
 
 
 def get_place_from_gemma(user_prompt):
-    """Formats the strict spatial system prompt, calls ask_gemma(), and verifies map coordinates."""
+    """
+    Formats prompt to calculate ticket breakdowns (e.g. Babies £0, Adults £15) and duration.
+    """
     formatted_prompt = f"""
     You are an expert travel planner and spatial routing assistant.
-    Find a REAL, existing physical business matching the user request.
+    Find a REAL, existing physical venue matching the user request.
     
-    STRICT SPATIAL CONSTRAINT:
-    If the user mentions a landmark (e.g. Big Ben, London Eye), the venue MUST be within a strict 10-minute walk (under 1 km / 0.6 miles) of that landmark.
-    Do NOT suggest venues in far neighborhoods (e.g. Covent Garden or Soho if Big Ben was asked).
-    
+    CRITICAL TICKET MATH & DURATION INSTRUCTIONS:
+    1. BABIES/INFANTS ARE FREE (£0.00). Do not charge for babies under 2 years old.
+    2. Extract individual per-person price (per_person_price).
+    3. Provide a clear price breakdown string in 'price_breakdown' (e.g., "(£15.00 x 2 Adults + 1 Baby Free) = £30.00").
+    4. Provide the total summed price in 'estimated_cost'.
+    5. Estimate activity duration and output start/end range (e.g. "02:00 PM - 04:30 PM").
+
     Respond ONLY with valid JSON with NO markdown formatting:
     {{
         "name": "REAL Venue Name",
-        "category": "Dining/Lunch/Activity",
-        "time": "07:00 PM",
-        "estimated_cost": 45.0,
+        "category": "Sightseeing/Dining/Activity",
+        "time": "02:00 PM - 04:30 PM",
+        "per_person_price": 15.0,
+        "price_breakdown": "(£15.00 x 2 Adults + 1 Baby Free)",
+        "estimated_cost": 30.0,
         "address": "Full real street address, City",
-        "lat": 51.5132,
-        "lng": -0.1558
+        "lat": 36.3932,
+        "lng": 25.4615
     }}
 
     User Request: {user_prompt}
@@ -113,16 +123,17 @@ def get_place_from_gemma(user_prompt):
     except Exception as e:
         print(f"⚠️ JSON Parsing fallback triggered: {e}")
         place_data = {
-            "name": "The Cinnamon Club",
-            "category": "Dining",
-            "time": "08:00 PM",
-            "estimated_cost": 38.0,
-            "address": "The Old Westminster Library, 30 Great Smith St, London SW1P 3BU",
-            "lat": 51.4979,
-            "lng": -0.1299
+            "name": "Akrotiri Archaeological Site",
+            "category": "Sightseeing",
+            "time": "02:00 PM - 04:30 PM",
+            "per_person_price": 15.0,
+            "price_breakdown": "(£15.00 x 2 Adults + 1 Baby Free)",
+            "estimated_cost": 30.0,
+            "address": "Akrotiri 847 00, Santorini, Greece",
+            "lat": 36.3514,
+            "lng": 25.4036
         }
 
-    # Cross-reference coordinates with OpenStreetMap
     real_lat, real_lng = get_real_coordinates(place_data.get("name", ""), place_data.get("address", ""))
     if real_lat is not None and real_lng is not None:
         place_data["lat"] = real_lat
@@ -144,23 +155,22 @@ def home():
 def add_item():
     payload = request.get_json(force=True) or {}
     user_prompt = payload.get("prompt", "")
-    # Default to an empty list [] so no initial default row exists
     existing_matrix = payload.get("current_matrix", [])
 
     if not user_prompt:
         return jsonify({"error": "Prompt is required"}), 400
 
-    # 1. AI Location Parse & Geocoding Check
+    # 1. Get AI recommendation
     new_place_data = get_place_from_gemma(user_prompt)
 
     # 2. Append to spreadsheet matrix
     updated_matrix = list(existing_matrix)
     updated_matrix.append(new_place_data)
 
-    # 3. Chronological Sorting Engine (Morning -> Night)
+    # 3. Sort chronologically by start time
     sorted_matrix = sort_itinerary_chronologically(updated_matrix)
 
-    # 4. Spatial Routing Engine (Calculate distance & flag long travel jumps)
+    # 4. Spatial Distance Calculations
     for i in range(len(sorted_matrix) - 1):
         curr_item = sorted_matrix[i]
         next_item = sorted_matrix[i + 1]
@@ -170,13 +180,12 @@ def add_item():
             next_item.get("lat", 0), next_item.get("lng", 0)
         )
         
-        # Flag if distance between consecutive steps exceeds 1.5 km (~15 min travel)
         if dist > 1.5:
-            next_item["travel_warning"] = f"🚶 ~{int(dist * 12)} min travel from {curr_item['name']}"
+            next_item["travel_warning"] = f"🚶 ~{int(dist * 12)} min travel ({dist:.1f} km) from {curr_item['name']}"
         else:
             next_item["travel_warning"] = None
 
-    # 5. Live Budget Calculator
+    # 5. Total Spent Calculation
     total_budget = sum(float(item.get("estimated_cost", 0)) for item in sorted_matrix)
 
     return jsonify({
@@ -188,5 +197,5 @@ def add_item():
 
 
 if __name__ == "__main__":
-    print("🚀 SheetMap Logic Engine running at http://127.0.0.1:5000", flush=True)
+    print("🚀 Spooky SheetMap Engine running at http://127.0.0.1:5000", flush=True)
     app.run(host="127.0.0.1", port=5000, debug=True)

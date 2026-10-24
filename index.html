@@ -2,151 +2,551 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>SheetMap - Gemma Trip Planner</title>
+    <title>SheetMap - Witchy Moon Edition</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        body {
+            background-color: #120a1c;
+            color: #fdf6e2;
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        #map {
+            width: 100%;
+            height: 100%;
+            background-color: #120a1c !important;
+        }
+        /* Dark witchy filter applied to standard OpenStreetMap tiles (100% free, zero key watermarks!) */
+        .leaflet-tile-container img {
+            filter: brightness(0.65) invert(1) contrast(2.8) hue-rotate(210deg) saturate(0.4);
+        }
+        .spooky-card {
+            background: linear-gradient(135deg, #1e0c29 0%, #281138 100%);
+            border: 1px solid #4a2168;
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #120a1c;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4a2168;
+            border-radius: 4px;
+        }
+    </style>
 </head>
-<body class="bg-gray-100 h-screen flex flex-col font-sans">
+<body class="h-screen flex flex-col overflow-hidden">
 
-    <!-- Header & Budget Banner -->
-    <header class="bg-slate-900 text-white p-4 flex justify-between items-center shadow-md">
-        <div>
-            <h1 class="text-2xl font-bold flex items-center gap-2">📊 SheetMap <span class="text-xs bg-emerald-500 px-2 py-0.5 rounded font-mono">Fusion</span></h1>
-            <p class="text-xs text-gray-400">Excel / Maps Smart Synchronizer via Gemma 4</p>
+    <!-- Top Header Navigation Bar -->
+    <header class="bg-gradient-to-r from-[#170824] via-[#2d1142] to-[#170824] p-3 border-b border-[#5c2880] flex justify-between items-center shadow-lg relative z-10">
+        <div class="flex items-center gap-3">
+            <span class="text-3xl">🎃</span>
+            <div>
+                <h1 class="text-xl font-extrabold tracking-wide text-white flex items-center gap-2">
+                    SheetMap <span class="text-xs bg-[#d96b43] text-black font-bold px-2 py-0.5 rounded uppercase tracking-wider">Witchy Moon Edition</span>
+                </h1>
+                <p class="text-xs text-[#e8a86b]">Smart Itinerary, Weather Engine & Collision Choice Modal via Gemma 4</p>
+            </div>
         </div>
-        <div class="bg-slate-800 px-4 py-2 rounded-lg border border-slate-700 text-right">
-            <span class="text-xs text-gray-400 uppercase tracking-wider block">Total Estimated Cost</span>
-            <span id="total-budget" class="text-2xl font-extrabold text-emerald-400">£12.00</span>
+
+        <!-- Trip Summary Header Details -->
+        <div class="hidden md:flex items-center gap-4 text-xs text-[#e8a86b] bg-[#1a0b26] px-4 py-2 rounded-lg border border-[#4a2168]">
+            <span id="header-dest">📍 Santorini, Greece</span>
+            <span>|</span>
+            <span id="header-hotel">🏨 Hotel Zizis Exclusive</span>
+            <span>|</span>
+            <span id="header-travelers">👥 4 Travelers</span>
+            <button onclick="openSetupModal()" class="ml-2 bg-[#3b184f] hover:bg-[#5c237a] text-[#fdf6e2] border border-[#8b3dff] px-2.5 py-1 rounded transition text-xs font-semibold">
+                ✏️ Edit Trip Setup
+            </button>
+        </div>
+
+        <!-- Budget Bar Card -->
+        <div class="bg-[#1e0c29] px-4 py-2 rounded-xl border border-[#8b3dff] text-right min-w-[200px]">
+            <div class="flex justify-between text-xs text-gray-300 font-semibold mb-1">
+                <span>SPENT</span>
+                <span>BUDGET</span>
+            </div>
+            <div class="text-lg font-black tracking-tight flex justify-between items-center text-[#e8a86b]">
+                <span id="spent-display" class="text-white">£0.00</span>
+                <span class="text-xs text-gray-400">/</span>
+                <span id="budget-display">£1500.00</span>
+            </div>
+            <div class="w-full bg-[#120a1c] h-1.5 rounded-full mt-1 overflow-hidden border border-[#4a2168]">
+                <div id="budget-progress-bar" class="bg-emerald-400 h-full transition-all duration-500" style="width: 0%"></div>
+            </div>
         </div>
     </header>
 
-    <!-- Main Workspace -->
+    <!-- Main Workspace (Split View) -->
     <div class="flex-1 flex overflow-hidden">
         
-        <!-- Left Pane: Spreadsheet -->
-        <div class="w-1/2 p-4 flex flex-col bg-white border-r border-gray-300">
-            <h2 class="text-sm font-bold text-gray-500 mb-2 uppercase">Trip Itinerary Spreadsheet</h2>
+        <!-- Left Pane: Day-Card Itinerary -->
+        <div class="w-1/2 p-4 flex flex-col bg-[#120a1c] border-r border-[#4a2168] overflow-y-auto space-y-4">
             
-            <div class="flex-1 overflow-auto border border-gray-200 rounded">
-                <table class="w-full text-left border-collapse text-sm">
-                    <thead class="bg-gray-100 text-gray-700 sticky top-0 border-b">
-                        <tr>
-                            <th class="p-2 border-r">Time</th>
-                            <th class="p-2 border-r">Place</th>
-                            <th class="p-2 border-r">Category</th>
-                            <th class="p-2 border-r">Cost</th>
-                            <th class="p-2">Address</th>
-                        </tr>
-                    </thead>
-                    <tbody id="sheet-body">
-                        <tr class="border-b hover:bg-gray-50">
-                            <td class="p-2 border-r font-mono text-indigo-600 font-bold">12:30 PM</td>
-                            <td class="p-2 border-r font-semibold text-gray-800">The Station Diner</td>
-                            <td class="p-2 border-r text-gray-600">Lunch</td>
-                            <td class="p-2 border-r font-mono">£12.00</td>
-                            <td class="p-2 text-xs text-gray-500">Euston Rd, London NW1 2RT</td>
-                        </tr>
-                    </tbody>
-                </table>
+            <!-- Trip Banner & Accommodations -->
+            <div class="spooky-card p-4 rounded-xl shadow-md border">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <span class="text-xs text-[#d96b43] font-bold uppercase tracking-wider">Destination & Accommodation</span>
+                        <h2 id="banner-title" class="text-lg font-extrabold text-[#fdf6e2] mt-0.5">Santorini, Greece (Hotel Zizis Exclusive)</h2>
+                    </div>
+                    <div class="text-right text-xs font-mono text-[#e8a86b]">
+                        <span>BOUNDARIES:</span>
+                        <div id="boundary-times" class="text-gray-300">Day 1 (Arr: 10:00 AM) ➔ Day 3 (Dep: 06:00 PM)</div>
+                    </div>
+                </div>
+
+                <div class="mt-3 pt-2 border-t border-[#3b184f] flex justify-between items-center text-xs">
+                    <span id="banner-accessibility" class="text-[#e8a86b]">♿ Needs: Stroller friendly, Low-sensory rest breaks</span>
+                    <span id="banner-group" class="text-gray-300">Group Size: 2 Adults, 1 Child, 1 Baby (Babies Free)</span>
+                </div>
             </div>
 
-            <!-- Input Bar -->
-            <div class="mt-4 flex gap-2">
-                <input id="prompt-input" type="text" placeholder="e.g. Find an upscale Italian dinner spot under £50 around 07:00 PM" 
-                       class="flex-1 p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
-                <button onclick="addItem()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-5 py-3 rounded-lg text-sm transition">
-                    + Add Row
+            <!-- Day-Card Container -->
+            <div id="day-cards-container" class="space-y-4">
+                <!-- Dynamically generated Day Cards render here -->
+            </div>
+
+            <!-- Must-Eat Delicacies Banner -->
+            <div class="spooky-card p-3 rounded-xl border text-xs">
+                <span class="font-bold text-[#d96b43] block mb-1">🍽️ MUST-SEE HIGHLIGHTS & MUST-EAT LOCAL DELICACIES</span>
+                <p id="delicacies-list" class="text-gray-300">Turkish Ice Cream Performance, Moussaka, Fresh Seafood, Sunset Caldera Tour</p>
+            </div>
+
+            <!-- Bottom Prompt Input Bar -->
+            <div class="pt-2 flex gap-2">
+                <input id="prompt-input" type="text" placeholder="e.g. Visit Akrotiri Museum around 02:00 PM" 
+                       class="flex-1 bg-[#1e0c29] border border-[#5c2880] p-3 rounded-xl text-sm text-white placeholder-gray-400 focus:outline-none focus:border-[#8b3dff]">
+                <button onclick="addUserSpot()" class="bg-[#d96b43] hover:bg-[#e8a86b] text-black font-bold px-5 py-3 rounded-xl text-sm transition shadow-lg flex items-center gap-1">
+                    + Add Spot
+                </button>
+                <button onclick="triggerGemmaAutoFill(1)" class="bg-[#3b184f] hover:bg-[#5c237a] text-[#fdf6e2] border border-[#8b3dff] font-bold px-4 py-3 rounded-xl text-sm transition flex items-center gap-1">
+                    🎃 Fill Free Slot
                 </button>
             </div>
         </div>
 
-        <!-- Right Pane: Map -->
-        <div class="w-1/2 h-full">
+        <!-- Right Pane: Interactive Leaflet Map -->
+        <div class="w-1/2 h-full relative">
             <div id="map" class="w-full h-full"></div>
+            <div class="absolute bottom-3 right-3 bg-[#1e0c29]/90 border border-[#5c2880] text-xs p-2 rounded-lg text-[#e8a86b] shadow-lg pointer-events-none z-[1000]">
+                📍 Interactive Route Canvas
+            </div>
         </div>
 
     </div>
 
-    <!-- JavaScript block MUST be wrapped inside <script> tags -->
+    <!-- Setup Modal Overlay -->
+    <div id="setup-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[2000] flex items-center justify-center p-4">
+        <div class="bg-[#1e0c29] border-2 border-[#8b3dff] w-full max-w-xl rounded-2xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto space-y-4">
+            <div class="flex justify-between items-center border-b border-[#4a2168] pb-3">
+                <h2 class="text-xl font-bold text-[#fdf6e2] flex items-center gap-2">
+                    🎃 Spooky Trip Setup & Boundaries
+                </h2>
+                <button onclick="closeSetupModal()" class="text-gray-400 hover:text-white text-xl">✕</button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 text-xs">
+                <div class="col-span-2">
+                    <label class="block text-gray-300 mb-1">Destination City / Region</label>
+                    <input id="modal-destination" type="text" value="Santorini, Greece" class="w-full bg-[#120a1c] border border-[#5c2880] p-2 rounded text-white">
+                </div>
+
+                <div>
+                    <label class="block text-gray-300 mb-1">Hotel / Accommodation Name</label>
+                    <input id="modal-hotel" type="text" value="Hotel Zizis Exclusive" class="w-full bg-[#120a1c] border border-[#5c2880] p-2 rounded text-white">
+                </div>
+
+                <div>
+                    <label class="block text-gray-300 mb-1">Total Trip Budget (£)</label>
+                    <input id="modal-budget" type="number" value="1500" class="w-full bg-[#120a1c] border border-[#5c2880] p-2 rounded text-white">
+                </div>
+
+                <div>
+                    <label class="block text-gray-300 mb-1">Day 1 Flight Arrival Time</label>
+                    <input id="modal-arr-time" type="time" value="10:00" class="w-full bg-[#120a1c] border border-[#5c2880] p-2 rounded text-white">
+                </div>
+
+                <div>
+                    <label class="block text-gray-300 mb-1">Hotel Check-in Time</label>
+                    <input id="modal-checkin-time" type="time" value="14:00" class="w-full bg-[#120a1c] border border-[#5c2880] p-2 rounded text-white">
+                </div>
+
+                <div>
+                    <label class="block text-gray-300 mb-1">Hotel Check-out Time</label>
+                    <input id="modal-checkout-time" type="time" value="11:00" class="w-full bg-[#120a1c] border border-[#5c2880] p-2 rounded text-white">
+                </div>
+
+                <div>
+                    <label class="block text-gray-300 mb-1">Last Day Flight Departure Time</label>
+                    <input id="modal-dep-time" type="time" value="18:00" class="w-full bg-[#120a1c] border border-[#5c2880] p-2 rounded text-white">
+                </div>
+
+                <div>
+                    <label class="block text-gray-300 mb-1">Trip Duration (Days)</label>
+                    <input id="modal-days" type="number" min="1" max="7" value="3" class="w-full bg-[#120a1c] border border-[#5c2880] p-2 rounded text-white">
+                </div>
+
+                <div>
+                    <label class="block text-gray-300 mb-1">Travelers Count</label>
+                    <input id="modal-travelers" type="text" value="2 Adults, 1 Child, 1 Baby" class="w-full bg-[#120a1c] border border-[#5c2880] p-2 rounded text-white">
+                </div>
+
+                <div class="col-span-2">
+                    <label class="block text-gray-300 mb-1">Accessibility / Traveler Needs</label>
+                    <input id="modal-needs" type="text" value="Stroller friendly, Low-sensory rest breaks" class="w-full bg-[#120a1c] border border-[#5c2880] p-2 rounded text-white">
+                </div>
+            </div>
+
+            <button onclick="saveTripSetup()" class="w-full bg-[#d96b43] hover:bg-[#e8a86b] text-black font-extrabold py-3 rounded-xl transition shadow-lg mt-4">
+                Initialize Custom Itinerary Matrix 🔮
+            </button>
+        </div>
+    </div>
+
+    <!-- Schedule Conflict Resolution Modal -->
+    <div id="collision-modal" class="hidden fixed inset-0 bg-black/85 backdrop-blur-sm z-[3000] flex items-center justify-center p-4">
+        <div class="bg-[#1e0c29] border-2 border-[#d96b43] w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-4">
+            <div class="flex items-center gap-3 text-[#d96b43]">
+                <span class="text-3xl">⚠️</span>
+                <h3 class="text-lg font-bold text-white">Schedule Collision Detected!</h3>
+            </div>
+            <p id="collision-description" class="text-xs text-gray-300 leading-relaxed">
+                The proposed activity time conflicts with an existing event on your itinerary.
+            </p>
+            <div id="collision-proposed-time" class="bg-[#120a1c] p-3 rounded-xl border border-[#4a2168] text-xs font-mono text-[#e8a86b]">
+                Suggested shift: Move to 05:15 PM - 07:45 PM
+            </div>
+            <div class="flex flex-col gap-2 pt-2">
+                <button id="collision-btn-shift" class="w-full bg-[#d96b43] text-black font-bold py-2.5 rounded-xl text-xs hover:bg-[#e8a86b] transition">
+                    🔄 Accept & Shift to Next Free Spot
+                </button>
+                <button id="collision-btn-replace" class="w-full bg-[#3b184f] text-[#fdf6e2] border border-[#8b3dff] font-bold py-2.5 rounded-xl text-xs hover:bg-[#5c237a] transition">
+                    💥 Replace Conflicting Spot
+                </button>
+                <button onclick="closeCollisionModal()" class="w-full bg-gray-800 text-gray-400 font-bold py-2 rounded-xl text-xs hover:bg-gray-700 transition">
+                    ✕ Cancel Addition
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- APPLICATION JAVASCRIPT -->
     <script>
-        let currentMatrix = [
-            {
-                name: "The Station Diner",
-                category: "Lunch",
-                time: "12:30 PM",
-                estimated_cost: 12.00,
-                address: "Euston Rd, London NW1 2RT",
-                lat: 51.528,
-                lng: -0.133
+        let tripState = {
+            destination: "Santorini, Greece",
+            hotel: "Hotel Zizis Exclusive",
+            budget: 1500.0,
+            arrTime: "10:00",
+            checkinTime: "14:00",
+            checkoutTime: "11:00",
+            depTime: "18:00",
+            days: 3,
+            travelers: "2 Adults, 1 Child, 1 Baby",
+            needs: "Stroller friendly, Low-sensory rest breaks"
+        };
+
+        let currentMatrix = [];
+        let pendingItem = null;
+        let map, mapMarkers = [], routePolyline = null;
+
+        window.addEventListener("DOMContentLoaded", () => {
+            initMap();
+            saveTripSetup();
+        });
+
+        function initMap() {
+            map = L.map('map').setView([36.3932, 25.4615], 12);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors',
+                maxZoom: 19
+            }).addTo(map);
+
+            setTimeout(() => {
+                map.invalidateSize();
+            }, 300);
+        }
+
+        function openSetupModal() {
+            document.getElementById("setup-modal").classList.remove("hidden");
+        }
+
+        function closeSetupModal() {
+            document.getElementById("setup-modal").classList.add("hidden");
+        }
+
+        function closeCollisionModal() {
+            document.getElementById("collision-modal").classList.add("hidden");
+            pendingItem = null;
+        }
+
+        function saveTripSetup() {
+            tripState.destination = document.getElementById("modal-destination").value;
+            tripState.hotel = document.getElementById("modal-hotel").value;
+            tripState.budget = parseFloat(document.getElementById("modal-budget").value) || 1000;
+            tripState.arrTime = document.getElementById("modal-arr-time").value;
+            tripState.checkinTime = document.getElementById("modal-checkin-time").value;
+            tripState.checkoutTime = document.getElementById("modal-checkout-time").value;
+            tripState.depTime = document.getElementById("modal-dep-time").value;
+            tripState.days = parseInt(document.getElementById("modal-days").value) || 3;
+            tripState.travelers = document.getElementById("modal-travelers").value;
+            tripState.needs = document.getElementById("modal-needs").value;
+
+            document.getElementById("header-dest").innerText = `📍 ${tripState.destination}`;
+            document.getElementById("header-hotel").innerText = `🏨 ${tripState.hotel}`;
+            document.getElementById("header-travelers").innerText = `👥 ${tripState.travelers}`;
+            document.getElementById("banner-title").innerText = `${tripState.destination} (${tripState.hotel})`;
+            document.getElementById("boundary-times").innerText = `Day 1 (Arr: ${format12Hr(tripState.arrTime)}) ➔ Day ${tripState.days} (Dep: ${format12Hr(tripState.depTime)})`;
+            document.getElementById("banner-accessibility").innerText = `♿ Needs: ${tripState.needs}`;
+            document.getElementById("banner-group").innerText = `Group Size: ${tripState.travelers} (Babies Free)`;
+            document.getElementById("budget-display").innerText = `£${tripState.budget.toFixed(2)}`;
+
+            currentMatrix = [
+                { day: 1, name: `Flight Arrival at ${tripState.destination}`, category: "Transit", time: format12Hr(tripState.arrTime), estimated_cost: 0, address: "Airport / Arrival Hub", lat: 36.3992, lng: 25.4793, isAnchor: true },
+                { day: 1, name: `Check-in at ${tripState.hotel}`, category: "Hotel", time: format12Hr(tripState.checkinTime), estimated_cost: 0, address: tripState.hotel, lat: 36.3932, lng: 25.4615, isAnchor: true },
+                { day: tripState.days, name: `Check-out from ${tripState.hotel}`, category: "Hotel", time: format12Hr(tripState.checkoutTime), estimated_cost: 0, address: tripState.hotel, lat: 36.3932, lng: 25.4615, isAnchor: true },
+                { day: tripState.days, name: `Flight Departure from ${tripState.destination}`, category: "Transit", time: format12Hr(tripState.depTime), estimated_cost: 0, address: "Airport / Departure Hub", lat: 36.3992, lng: 25.4793, isAnchor: true }
+            ];
+
+            closeSetupModal();
+            renderItinerary();
+        }
+
+        function format12Hr(time24) {
+            if (!time24) return "12:00 PM";
+            let [h, m] = time24.split(":");
+            let hour = parseInt(h);
+            let ampm = hour >= 12 ? "PM" : "AM";
+            hour = hour % 12 || 12;
+            return `${hour < 10 ? '0' + hour : hour}:${m} ${ampm}`;
+        }
+
+        function timeToMinutes(timeStr) {
+            try {
+                let cleanStr = timeStr.includes("-") ? timeStr.split("-")[0].trim() : timeStr.trim();
+                let [time, modifier] = cleanStr.split(" ");
+                let [hours, minutes] = time.split(":");
+                let h = parseInt(hours);
+                if (modifier === "PM" && h < 12) h += 12;
+                if (modifier === "AM" && h === 12) h = 0;
+                return h * 60 + parseInt(minutes);
+            } catch (e) {
+                return 720;
             }
-        ];
+        }
 
-        // Initialize Map
-        const map = L.map('map').setView([51.528, -0.133], 13);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap'
-        }).addTo(map);
+        function minutesToTimeStr(mins) {
+            let h = Math.floor(mins / 60);
+            let m = mins % 60;
+            let ampm = h >= 12 ? "PM" : "AM";
+            h = h % 12 || 12;
+            return `${h < 10 ? '0' + h : h}:${m < 10 ? '0' + m : m} ${ampm}`;
+        }
 
-        L.marker([51.528, -0.133]).addTo(map).bindPopup("<b>The Station Diner</b><br>12:30 PM - £12.00");
-
-        async function addItem() {
+        async function addUserSpot() {
             const inputField = document.getElementById("prompt-input");
             const promptText = inputField.value.trim();
             if (!promptText) return;
 
             inputField.disabled = true;
-            inputField.value = "⏳ Sorting and organizing itinerary...";
+            inputField.value = "⏳ Gemma AI is planning your spot...";
 
             try {
                 const res = await fetch("/add-item", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ 
-                        prompt: promptText,
-                        current_matrix: currentMatrix 
+                    body: JSON.stringify({
+                        prompt: `${promptText} in ${tripState.destination} for ${tripState.travelers} (Note: Babies under 2 are FREE) with accessibility needs: ${tripState.needs}`,
+                        current_matrix: currentMatrix
                     })
                 });
 
                 const json = await res.json();
-                if (json.success) {
-                    currentMatrix = json.master_matrix;
-                    renderSpreadsheet(currentMatrix);
-
-                    document.getElementById("total-budget").innerText = `£${json.total_budget.toFixed(2)}`;
-
-                    const newItem = json.added_item;
-                    const marker = L.marker([newItem.lat, newItem.lng]).addTo(map);
-                    marker.bindPopup(`<b>${newItem.name}</b><br>${newItem.time} - £${newItem.estimated_cost}`).openPopup();
-                    map.flyTo([newItem.lat, newItem.lng], 14);
-
+                if (json.success && json.added_item) {
+                    let newItem = json.added_item;
+                    newItem.day = promptText.toLowerCase().includes("day 2") ? 2 : (promptText.toLowerCase().includes("day 3") ? 3 : 1);
+                    checkAndInsertItem(newItem);
                     inputField.value = "";
                 } else {
-                    alert("Error: " + json.error);
+                    alert("Error: " + (json.error || "Could not fetch spot details"));
                 }
             } catch (err) {
-                alert("Failed to connect to backend server.");
+                console.error(err);
+                alert("Failed to connect to Python backend server.");
             } finally {
                 inputField.disabled = false;
             }
         }
 
-        function renderSpreadsheet(matrix) {
-            const tableBody = document.getElementById("sheet-body");
-            tableBody.innerHTML = "";
+        function triggerGemmaAutoFill(dayNum) {
+            let baseRate = dayNum === 2 ? 15.0 : 12.0;
+            let suggestedSpot = {
+                day: dayNum,
+                name: dayNum === 1 ? "Sunset Caldera Wine Tasting Tour" : (dayNum === 2 ? "Akrotiri Archaeological Museum Tour" : "Oia Castle Sunset Viewpoint"),
+                category: "Sightseeing",
+                time: dayNum === 2 ? "02:00 PM - 05:00 PM" : "04:30 PM - 06:00 PM",
+                per_person_price: baseRate,
+                price_breakdown: `(£${baseRate.toFixed(2)} x 2 Adults + 1 Baby Free)`,
+                estimated_cost: baseRate * 2, // 2 Paying adults, baby is free!
+                address: "Fira - Oia Cliffside Walk, Santorini",
+                lat: 36.4166,
+                lng: 25.4324
+            };
+            checkAndInsertItem(suggestedSpot);
+        }
 
-            matrix.forEach(item => {
-                const row = document.createElement("tr");
-                row.className = "border-b hover:bg-gray-50 transition duration-300";
-                row.innerHTML = `
-                    <td class="p-2 border-r font-mono text-indigo-600 font-bold">${item.time}</td>
-                    <td class="p-2 border-r font-semibold text-gray-800">${item.name}</td>
-                    <td class="p-2 border-r text-gray-600">${item.category}</td>
-                    <td class="p-2 border-r font-mono">£${parseFloat(item.estimated_cost).toFixed(2)}</td>
-                    <td class="p-2 text-xs text-gray-500">${item.address}</td>
-                `;
-                tableBody.appendChild(row);
+        function checkAndInsertItem(newItem) {
+            let newMins = timeToMinutes(newItem.time);
+            
+            let conflict = currentMatrix.find((item) => {
+                let itemMins = timeToMinutes(item.time);
+                return item.day === newItem.day && Math.abs(itemMins - newMins) < 90;
             });
+
+            if (conflict) {
+                pendingItem = newItem;
+                let startShiftMins = newMins + 150;
+                let endShiftMins = startShiftMins + 150;
+                let rangeShiftStr = `${minutesToTimeStr(startShiftMins)} - ${minutesToTimeStr(endShiftMins)}`;
+
+                document.getElementById("collision-description").innerText = 
+                    `"${newItem.name}" (${newItem.time}) conflicts with existing spot "${conflict.name}" (${conflict.time}).`;
+                document.getElementById("collision-proposed-time").innerText = 
+                    `Suggested Shift: Move to ${rangeShiftStr}`;
+                
+                document.getElementById("collision-btn-shift").onclick = () => {
+                    pendingItem.time = rangeShiftStr;
+                    commitItem(pendingItem);
+                    closeCollisionModal();
+                };
+
+                document.getElementById("collision-btn-replace").onclick = () => {
+                    currentMatrix = currentMatrix.filter(i => i !== conflict);
+                    commitItem(pendingItem);
+                    closeCollisionModal();
+                };
+
+                document.getElementById("collision-modal").classList.remove("hidden");
+            } else {
+                commitItem(newItem);
+            }
+        }
+
+        function commitItem(item) {
+            currentMatrix.push(item);
+            sortMatrix();
+            renderItinerary();
+        }
+
+        function sortMatrix() {
+            currentMatrix.sort((a, b) => {
+                if (a.day !== b.day) return a.day - b.day;
+                return timeToMinutes(a.time) - timeToMinutes(b.time);
+            });
+        }
+
+        function renderItinerary() {
+            const container = document.getElementById("day-cards-container");
+            container.innerHTML = "";
+
+            let totalSpent = 0;
+
+            for (let d = 1; d <= tripState.days; d++) {
+                let dayItems = currentMatrix.filter(item => item.day === d);
+
+                let dayCard = document.createElement("div");
+                dayCard.className = "spooky-card rounded-xl border p-3 shadow-md space-y-3";
+
+                let dayHeader = `
+                    <div class="flex justify-between items-center border-b border-[#4a2168] pb-2">
+                        <div class="flex items-center gap-2">
+                            <span class="bg-[#d96b43] text-black font-extrabold text-xs px-2 py-1 rounded">DAY 0${d}</span>
+                            <span class="text-xs text-[#e8a86b] font-mono">Santorini Route Block</span>
+                        </div>
+                        <button onclick="triggerGemmaAutoFill(${d})" class="text-xs text-[#8b3dff] hover:text-[#e8a86b] font-semibold">
+                            + Suggest activity for Day ${d}
+                        </button>
+                    </div>
+                `;
+
+                let rowsHtml = "";
+                if (dayItems.length === 0) {
+                    rowsHtml = `
+                        <div class="p-4 text-center border border-dashed border-[#4a2168] rounded-xl text-xs text-gray-400">
+                            Free Time Available for Exploration
+                            <button onclick="triggerGemmaAutoFill(${d})" class="block mx-auto mt-2 bg-[#3b184f] text-[#fdf6e2] px-3 py-1.5 rounded-lg border border-[#8b3dff]">
+                                🎃 Fill Day ${d} Free Slot
+                            </button>
+                        </div>
+                    `;
+                } else {
+                    dayItems.forEach(item => {
+                        let cost = parseFloat(item.estimated_cost) || 0;
+                        totalSpent += cost;
+
+                        let startMins = timeToMinutes(item.time);
+                        let isNight = startMins >= 1140 || startMins < 360;
+                        let weatherBadge = isNight ? "🌙 18°C" : "☀️ 23°C";
+
+                        // Formula + Breakdown string display
+                        let mathBreakdown = item.price_breakdown ? `${item.price_breakdown} = £${cost.toFixed(2)}` : `£${cost.toFixed(2)}`;
+                        let costTag = cost > 0 ? mathBreakdown : "";
+
+                        rowsHtml += `
+                            <div class="bg-[#120a1c] p-2.5 rounded-lg border border-[#3b184f] flex justify-between items-center text-xs hover:border-[#8b3dff] transition">
+                                <div class="space-y-0.5">
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-mono text-[#8b3dff] font-bold">${item.time}</span>
+                                        <span class="font-semibold text-white">${item.name}</span>
+                                    </div>
+                                    <p class="text-gray-400 text-[11px]">${item.address}</p>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    ${costTag ? `<span class="font-mono text-[#e8a86b] font-bold text-[11px] bg-[#1e0c29] px-2 py-0.5 rounded border border-[#4a2168]">${costTag}</span>` : ""}
+                                    <span class="bg-[#1e0c29] border border-[#5c2880] px-2 py-0.5 rounded text-[10px] text-gray-300">${weatherBadge}</span>
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+
+                dayCard.innerHTML = dayHeader + `<div class="space-y-2">${rowsHtml}</div>`;
+                container.appendChild(dayCard);
+            }
+
+            document.getElementById("spent-display").innerText = `£${totalSpent.toFixed(2)}`;
+            let pct = Math.min((totalSpent / tripState.budget) * 100, 100);
+            let progressBar = document.getElementById("budget-progress-bar");
+            progressBar.style.width = `${pct}%`;
+            progressBar.className = pct > 100 ? "bg-red-500 h-full" : (pct > 80 ? "bg-amber-500 h-full" : "bg-emerald-400 h-full");
+
+            updateMapMarkers();
+        }
+
+        function updateMapMarkers() {
+            mapMarkers.forEach(m => map.removeLayer(m));
+            mapMarkers = [];
+            if (routePolyline) map.removeLayer(routePolyline);
+
+            let latLngs = [];
+
+            currentMatrix.forEach(item => {
+                if (item.lat && item.lng) {
+                    let marker = L.marker([item.lat, item.lng]).addTo(map);
+                    marker.bindPopup(`<b>${item.name}</b><br>${item.time}`);
+                    mapMarkers.push(marker);
+                    latLngs.push([item.lat, item.lng]);
+                }
+            });
+
+            if (latLngs.length > 1) {
+                routePolyline = L.polyline(latLngs, { color: '#8b3dff', weight: 3, dashArray: '6, 6' }).addTo(map);
+                map.fitBounds(routePolyline.getBounds(), { padding: [30, 30] });
+            }
         }
     </script>
 </body>
