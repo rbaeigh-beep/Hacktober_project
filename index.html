@@ -17,13 +17,16 @@
             height: 100%;
             background-color: #120a1c !important;
         }
-        /* Dark witchy filter applied to standard OpenStreetMap tiles (100% free, zero key watermarks!) */
         .leaflet-tile-container img {
             filter: brightness(0.65) invert(1) contrast(2.8) hue-rotate(210deg) saturate(0.4);
         }
         .spooky-card {
             background: linear-gradient(135deg, #1e0c29 0%, #281138 100%);
             border: 1px solid #4a2168;
+        }
+        .over-budget-glow {
+            box-shadow: 0 0 15px #ef4444;
+            border-color: #ef4444 !important;
         }
         ::-webkit-scrollbar {
             width: 6px;
@@ -38,7 +41,6 @@
     </style>
 </head>
 <body class="h-screen flex flex-col overflow-hidden">
-
     <!-- Top Header Navigation Bar -->
     <header class="bg-gradient-to-r from-[#170824] via-[#2d1142] to-[#170824] p-3 border-b border-[#5c2880] flex justify-between items-center shadow-lg relative z-10">
         <div class="flex items-center gap-3">
@@ -50,23 +52,21 @@
                 <p class="text-xs text-[#e8a86b]">Smart Itinerary, Weather Engine & Collision Choice Modal via Gemma 4</p>
             </div>
         </div>
-
         <!-- Trip Summary Header Details -->
         <div class="hidden md:flex items-center gap-4 text-xs text-[#e8a86b] bg-[#1a0b26] px-4 py-2 rounded-lg border border-[#4a2168]">
-            <span id="header-dest">📍 London, United Kingdom</span>
+            <span id="header-dest">📍 Santorini, Greece</span>
             <span>|</span>
-            <span id="header-hotel">🏨 Standard Hotel</span>
+            <span id="header-hotel">🏨 Hotel Zizis Exclusive</span>
             <span>|</span>
-            <span id="header-travelers">👥 2 Adults, 1 Child, 1 Baby</span>
+            <span id="header-travelers">👥 4 Travelers</span>
             <button onclick="openSetupModal()" class="ml-2 bg-[#3b184f] hover:bg-[#5c237a] text-[#fdf6e2] border border-[#8b3dff] px-2.5 py-1 rounded transition text-xs font-semibold">
                 ✏️ Edit Trip Setup
             </button>
         </div>
-
         <!-- Budget Bar Card -->
-        <div class="bg-[#1e0c29] px-4 py-2 rounded-xl border border-[#8b3dff] text-right min-w-[200px]">
+        <div id="budget-card" class="bg-[#1e0c29] px-4 py-2 rounded-xl border border-[#8b3dff] text-right min-w-[200px] transition-all duration-300">
             <div class="flex justify-between text-xs text-gray-300 font-semibold mb-1">
-                <span>SPENT</span>
+                <span id="spent-label">SPENT</span>
                 <span>BUDGET</span>
             </div>
             <div class="text-lg font-black tracking-tight flex justify-between items-center text-[#e8a86b]">
@@ -79,46 +79,56 @@
             </div>
         </div>
     </header>
-
+    
     <!-- Main Workspace (Split View) -->
     <div class="flex-1 flex overflow-hidden">
         
         <!-- Left Pane: Day-Card Itinerary -->
         <div class="w-1/2 p-4 flex flex-col bg-[#120a1c] border-r border-[#4a2168] overflow-y-auto space-y-4">
             
+            <!-- OVER BUDGET WARNING BANNER -->
+            <div id="budget-alert-banner" class="hidden bg-gradient-to-r from-red-900/90 to-red-950/90 border-2 border-red-500 p-3 rounded-xl flex items-center justify-between text-xs shadow-xl animate-pulse">
+                <div class="flex items-center gap-2.5">
+                    <span class="text-2xl">🚨</span>
+                    <div>
+                        <span class="font-extrabold text-red-300 block text-sm">Budget Limit Exceeded!</span>
+                        <p id="budget-alert-text" class="text-gray-200">You are £0.00 over your planned trip budget.</p>
+                    </div>
+                </div>
+                <button onclick="triggerBudgetOptimization()" class="bg-red-500 hover:bg-red-400 text-black font-extrabold px-3 py-2 rounded-lg transition shadow">
+                    💸 Gemma Free-Alternatives
+                </button>
+            </div>
+
             <!-- Trip Banner & Accommodations -->
             <div class="spooky-card p-4 rounded-xl shadow-md border">
                 <div class="flex justify-between items-start">
                     <div>
                         <span class="text-xs text-[#d96b43] font-bold uppercase tracking-wider">Destination & Accommodation</span>
-                        <h2 id="banner-title" class="text-lg font-extrabold text-[#fdf6e2] mt-0.5">London, United Kingdom (Standard Hotel)</h2>
+                        <h2 id="banner-title" class="text-lg font-extrabold text-[#fdf6e2] mt-0.5">Santorini, Greece (Hotel Zizis Exclusive)</h2>
                     </div>
                     <div class="text-right text-xs font-mono text-[#e8a86b]">
                         <span>BOUNDARIES:</span>
                         <div id="boundary-times" class="text-gray-300">Day 1 (Arr: 10:00 AM) ➔ Day 3 (Dep: 06:00 PM)</div>
                     </div>
                 </div>
-
                 <div class="mt-3 pt-2 border-t border-[#3b184f] flex justify-between items-center text-xs">
                     <span id="banner-accessibility" class="text-[#e8a86b]">♿ Needs: Stroller friendly, Low-sensory rest breaks</span>
                     <span id="banner-group" class="text-gray-300">Group Size: 2 Adults, 1 Child, 1 Baby (Babies Free)</span>
                 </div>
             </div>
-
             <!-- Day-Card Container -->
             <div id="day-cards-container" class="space-y-4">
                 <!-- Dynamically generated Day Cards render here -->
             </div>
-
             <!-- Must-Eat Delicacies Banner -->
             <div class="spooky-card p-3 rounded-xl border text-xs">
                 <span class="font-bold text-[#d96b43] block mb-1">🍽️ MUST-SEE HIGHLIGHTS & MUST-EAT LOCAL DELICACIES</span>
-                <p id="delicacies-list" class="text-gray-300">Fish & Chips, Afternoon Tea, British Museum, West End Theatre</p>
+                <p id="delicacies-list" class="text-gray-300">Turkish Ice Cream Performance, Moussaka, Fresh Seafood, Sunset Caldera Tour</p>
             </div>
-
             <!-- Bottom Prompt Input Bar -->
             <div class="pt-2 flex gap-2">
-                <input id="prompt-input" type="text" placeholder="e.g. Visit Natural History Museum on Day 2" 
+                <input id="prompt-input" type="text" placeholder="e.g. Visit Akrotiri Museum around 02:00 PM" 
                        class="flex-1 bg-[#1e0c29] border border-[#5c2880] p-3 rounded-xl text-sm text-white placeholder-gray-400 focus:outline-none focus:border-[#8b3dff]">
                 <button onclick="addUserSpot()" class="bg-[#d96b43] hover:bg-[#e8a86b] text-black font-bold px-5 py-3 rounded-xl text-sm transition shadow-lg flex items-center gap-1">
                     + Add Spot
@@ -128,7 +138,6 @@
                 </button>
             </div>
         </div>
-
         <!-- Right Pane: Interactive Leaflet Map -->
         <div class="w-1/2 h-full relative">
             <div id="map" class="w-full h-full"></div>
@@ -136,7 +145,6 @@
                 📍 Interactive Route Canvas
             </div>
         </div>
-
     </div>
 
     <!-- Setup Modal Overlay -->
@@ -148,59 +156,48 @@
                 </h2>
                 <button onclick="closeSetupModal()" class="text-gray-400 hover:text-white text-xl">✕</button>
             </div>
-
             <div class="grid grid-cols-2 gap-4 text-xs">
                 <div class="col-span-2">
                     <label class="block text-gray-300 mb-1">Destination City / Region</label>
-                    <input id="modal-destination" type="text" value="London, United Kingdom" class="w-full bg-[#120a1c] border border-[#5c2880] p-2 rounded text-white">
+                    <input id="modal-destination" type="text" value="Santorini, Greece" class="w-full bg-[#120a1c] border border-[#5c2880] p-2 rounded text-white">
                 </div>
-
                 <div>
                     <label class="block text-gray-300 mb-1">Hotel / Accommodation Name</label>
-                    <input id="modal-hotel" type="text" value="Standard Hotel" class="w-full bg-[#120a1c] border border-[#5c2880] p-2 rounded text-white">
+                    <input id="modal-hotel" type="text" value="Hotel Zizis Exclusive" class="w-full bg-[#120a1c] border border-[#5c2880] p-2 rounded text-white">
                 </div>
-
                 <div>
                     <label class="block text-gray-300 mb-1">Total Trip Budget (£)</label>
                     <input id="modal-budget" type="number" value="1500" class="w-full bg-[#120a1c] border border-[#5c2880] p-2 rounded text-white">
                 </div>
-
                 <div>
                     <label class="block text-gray-300 mb-1">Day 1 Flight Arrival Time</label>
                     <input id="modal-arr-time" type="time" value="10:00" class="w-full bg-[#120a1c] border border-[#5c2880] p-2 rounded text-white">
                 </div>
-
                 <div>
                     <label class="block text-gray-300 mb-1">Hotel Check-in Time</label>
                     <input id="modal-checkin-time" type="time" value="14:00" class="w-full bg-[#120a1c] border border-[#5c2880] p-2 rounded text-white">
                 </div>
-
                 <div>
                     <label class="block text-gray-300 mb-1">Hotel Check-out Time</label>
                     <input id="modal-checkout-time" type="time" value="11:00" class="w-full bg-[#120a1c] border border-[#5c2880] p-2 rounded text-white">
                 </div>
-
                 <div>
                     <label class="block text-gray-300 mb-1">Last Day Flight Departure Time</label>
                     <input id="modal-dep-time" type="time" value="18:00" class="w-full bg-[#120a1c] border border-[#5c2880] p-2 rounded text-white">
                 </div>
-
                 <div>
                     <label class="block text-gray-300 mb-1">Trip Duration (Days)</label>
                     <input id="modal-days" type="number" min="1" max="7" value="3" class="w-full bg-[#120a1c] border border-[#5c2880] p-2 rounded text-white">
                 </div>
-
                 <div>
                     <label class="block text-gray-300 mb-1">Travelers Count</label>
                     <input id="modal-travelers" type="text" value="2 Adults, 1 Child, 1 Baby" class="w-full bg-[#120a1c] border border-[#5c2880] p-2 rounded text-white">
                 </div>
-
                 <div class="col-span-2">
                     <label class="block text-gray-300 mb-1">Accessibility / Traveler Needs</label>
                     <input id="modal-needs" type="text" value="Stroller friendly, Low-sensory rest breaks" class="w-full bg-[#120a1c] border border-[#5c2880] p-2 rounded text-white">
                 </div>
             </div>
-
             <button onclick="saveTripSetup()" class="w-full bg-[#d96b43] hover:bg-[#e8a86b] text-black font-extrabold py-3 rounded-xl transition shadow-lg mt-4">
                 Initialize Custom Itinerary Matrix 🔮
             </button>
@@ -237,8 +234,8 @@
     <!-- APPLICATION JAVASCRIPT -->
     <script>
         let tripState = {
-            destination: "London, United Kingdom",
-            hotel: "Standard Hotel",
+            destination: "Santorini, Greece",
+            hotel: "Hotel Zizis Exclusive",
             budget: 1500.0,
             arrTime: "10:00",
             checkinTime: "14:00",
@@ -248,7 +245,6 @@
             travelers: "2 Adults, 1 Child, 1 Baby",
             needs: "Stroller friendly, Low-sensory rest breaks"
         };
-
         let currentMatrix = [];
         let pendingItem = null;
         let map, mapMarkers = [], routePolyline = null;
@@ -259,14 +255,11 @@
         });
 
         function initMap() {
-            // Default London map view
-            map = L.map('map').setView([51.5074, -0.1278], 12);
-
+            map = L.map('map').setView([36.3932, 25.4615], 12);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '&copy; OpenStreetMap contributors',
                 maxZoom: 19
             }).addTo(map);
-
             setTimeout(() => {
                 map.invalidateSize();
             }, 300);
@@ -285,7 +278,7 @@
             pendingItem = null;
         }
 
-        async function saveTripSetup() {
+        function saveTripSetup() {
             tripState.destination = document.getElementById("modal-destination").value;
             tripState.hotel = document.getElementById("modal-hotel").value;
             tripState.budget = parseFloat(document.getElementById("modal-budget").value) || 1000;
@@ -306,26 +299,11 @@
             document.getElementById("banner-group").innerText = `Group Size: ${tripState.travelers} (Babies Free)`;
             document.getElementById("budget-display").innerText = `£${tripState.budget.toFixed(2)}`;
 
-            // DYNAMIC CITY GEOCODING: Auto-centers map view on user's target destination
-            let destLat = 51.5074, destLng = -0.1278;
-            try {
-                let geoRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(tripState.destination)}`);
-                let geoData = await geoRes.json();
-                if (geoData && geoData.length > 0) {
-                    destLat = parseFloat(geoData[0].lat);
-                    destLng = parseFloat(geoData[0].lon);
-                }
-            } catch (e) {
-                console.warn("Geocoding failed, using standard fallback coordinates");
-            }
-
-            map.setView([destLat, destLng], 12);
-
             currentMatrix = [
-                { day: 1, name: `Flight Arrival at ${tripState.destination}`, category: "Transit", time: format12Hr(tripState.arrTime), estimated_cost: 0, address: `${tripState.destination} Airport / Arrival Hub`, lat: destLat + 0.02, lng: destLng + 0.02, isAnchor: true },
-                { day: 1, name: `Check-in at ${tripState.hotel}`, category: "Hotel", time: format12Hr(tripState.checkinTime), estimated_cost: 0, address: tripState.hotel, lat: destLat, lng: destLng, isAnchor: true },
-                { day: tripState.days, name: `Check-out from ${tripState.hotel}`, category: "Hotel", time: format12Hr(tripState.checkoutTime), estimated_cost: 0, address: tripState.hotel, lat: destLat, lng: destLng, isAnchor: true },
-                { day: tripState.days, name: `Flight Departure from ${tripState.destination}`, category: "Transit", time: format12Hr(tripState.depTime), estimated_cost: 0, address: `${tripState.destination} Airport / Departure Hub`, lat: destLat + 0.02, lng: destLng + 0.02, isAnchor: true }
+                { day: 1, name: `Flight Arrival at ${tripState.destination}`, category: "Transit", time: format12Hr(tripState.arrTime), estimated_cost: 0, address: "Airport / Arrival Hub", lat: 36.3992, lng: 25.4793, isAnchor: true },
+                { day: 1, name: `Check-in at ${tripState.hotel}`, category: "Hotel", time: format12Hr(tripState.checkinTime), estimated_cost: 0, address: tripState.hotel, lat: 36.3932, lng: 25.4615, isAnchor: true },
+                { day: tripState.days, name: `Check-out from ${tripState.hotel}`, category: "Hotel", time: format12Hr(tripState.checkoutTime), estimated_cost: 0, address: tripState.hotel, lat: 36.3932, lng: 25.4615, isAnchor: true },
+                { day: tripState.days, name: `Flight Departure from ${tripState.destination}`, category: "Transit", time: format12Hr(tripState.depTime), estimated_cost: 0, address: "Airport / Departure Hub", lat: 36.3992, lng: 25.4793, isAnchor: true }
             ];
 
             closeSetupModal();
@@ -398,28 +376,27 @@
             }
         }
 
-        async function triggerGemmaAutoFill(dayNum) {
-            const promptText = `Suggest a top-rated venue or tour for Day ${dayNum} in ${tripState.destination} for ${tripState.travelers}`;
-            
-            try {
-                const res = await fetch("/add-item", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        prompt: promptText,
-                        current_matrix: currentMatrix
-                    })
-                });
+        function triggerGemmaAutoFill(dayNum) {
+            let baseRate = dayNum === 2 ? 15.0 : 12.0;
+            let suggestedSpot = {
+                day: dayNum,
+                name: dayNum === 1 ? "Sunset Caldera Wine Tasting Tour" : (dayNum === 2 ? "Akrotiri Archaeological Museum Tour" : "Oia Castle Sunset Viewpoint"),
+                category: "Sightseeing",
+                time: dayNum === 2 ? "02:00 PM - 05:00 PM" : "04:30 PM - 06:00 PM",
+                per_person_price: baseRate,
+                price_breakdown: `(£${baseRate.toFixed(2)} x 2 Adults + 1 Baby Free)`,
+                estimated_cost: baseRate * 2,
+                address: "Fira - Oia Cliffside Walk, Santorini",
+                lat: 36.4166,
+                lng: 25.4324
+            };
+            checkAndInsertItem(suggestedSpot);
+        }
 
-                const json = await res.json();
-                if (json.success && json.added_item) {
-                    let newItem = json.added_item;
-                    newItem.day = dayNum;
-                    checkAndInsertItem(newItem);
-                }
-            } catch (err) {
-                console.error("Auto-fill suggestion error:", err);
-            }
+        function triggerBudgetOptimization() {
+            let inputField = document.getElementById("prompt-input");
+            inputField.value = `Suggest a FREE or cheap scenic activity in ${tripState.destination}`;
+            addUserSpot();
         }
 
         function checkAndInsertItem(newItem) {
@@ -475,20 +452,18 @@
         function renderItinerary() {
             const container = document.getElementById("day-cards-container");
             container.innerHTML = "";
-
             let totalSpent = 0;
 
             for (let d = 1; d <= tripState.days; d++) {
                 let dayItems = currentMatrix.filter(item => item.day === d);
-
                 let dayCard = document.createElement("div");
                 dayCard.className = "spooky-card rounded-xl border p-3 shadow-md space-y-3";
-
+                
                 let dayHeader = `
                     <div class="flex justify-between items-center border-b border-[#4a2168] pb-2">
                         <div class="flex items-center gap-2">
                             <span class="bg-[#d96b43] text-black font-extrabold text-xs px-2 py-1 rounded">DAY 0${d}</span>
-                            <span class="text-xs text-[#e8a86b] font-mono">${tripState.destination} Route Block</span>
+                            <span class="text-xs text-[#e8a86b] font-mono">Santorini Route Block</span>
                         </div>
                         <button onclick="triggerGemmaAutoFill(${d})" class="text-xs text-[#8b3dff] hover:text-[#e8a86b] font-semibold">
                             + Suggest activity for Day ${d}
@@ -510,7 +485,6 @@
                     dayItems.forEach(item => {
                         let cost = parseFloat(item.estimated_cost) || 0;
                         totalSpent += cost;
-
                         let startMins = timeToMinutes(item.time);
                         let isNight = startMins >= 1140 || startMins < 360;
                         let weatherBadge = isNight ? "🌙 18°C" : "☀️ 23°C";
@@ -535,16 +509,34 @@
                         `;
                     });
                 }
-
                 dayCard.innerHTML = dayHeader + `<div class="space-y-2">${rowsHtml}</div>`;
                 container.appendChild(dayCard);
             }
 
+            // DYNAMIC BUDGET WARNING SYSTEM
             document.getElementById("spent-display").innerText = `£${totalSpent.toFixed(2)}`;
             let pct = Math.min((totalSpent / tripState.budget) * 100, 100);
             let progressBar = document.getElementById("budget-progress-bar");
+            let budgetCard = document.getElementById("budget-card");
+            let alertBanner = document.getElementById("budget-alert-banner");
+
             progressBar.style.width = `${pct}%`;
-            progressBar.className = pct > 100 ? "bg-red-500 h-full" : (pct > 80 ? "bg-amber-500 h-full" : "bg-emerald-400 h-full");
+
+            if (totalSpent > tripState.budget) {
+                let overage = totalSpent - tripState.budget;
+                progressBar.className = "bg-red-500 h-full animate-pulse";
+                budgetCard.classList.add("over-budget-glow");
+                document.getElementById("spent-label").innerText = "EXCEEDED";
+                document.getElementById("spent-label").className = "text-red-400 font-extrabold";
+                document.getElementById("budget-alert-text").innerText = `You are £${overage.toFixed(2)} over your £${tripState.budget.toFixed(2)} planned trip budget!`;
+                alertBanner.classList.remove("hidden");
+            } else {
+                progressBar.className = pct > 80 ? "bg-amber-500 h-full" : "bg-emerald-400 h-full";
+                budgetCard.classList.remove("over-budget-glow");
+                document.getElementById("spent-label").innerText = "SPENT";
+                document.getElementById("spent-label").className = "text-gray-300 font-semibold";
+                alertBanner.classList.add("hidden");
+            }
 
             updateMapMarkers();
         }
@@ -555,7 +547,6 @@
             if (routePolyline) map.removeLayer(routePolyline);
 
             let latLngs = [];
-
             currentMatrix.forEach(item => {
                 if (item.lat && item.lng) {
                     let marker = L.marker([item.lat, item.lng]).addTo(map);

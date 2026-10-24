@@ -3,7 +3,7 @@ import json
 import math
 import requests
 from flask import Flask, jsonify, request, render_template
-from gemma_integration import ask_gemma  # Imports your teammate's integration function!
+from gemma_integration import ask_gemma  # Teammate's integration function!
 
 app = Flask(__name__, template_folder='.')
 
@@ -12,7 +12,7 @@ app = Flask(__name__, template_folder='.')
 # -------------------------------------------------------------
 
 def parse_time_to_minutes(time_str):
-    """Parses time strings like '02:00 PM - 05:00 PM' or '10:00 AM' into start-minutes from midnight for chronological sorting."""
+    """Parses time strings like '02:00 PM - 05:00 PM' into start-minutes from midnight for sorting."""
     try:
         clean_time = str(time_str).strip().upper()
         if "-" in clean_time:
@@ -47,8 +47,8 @@ def calculate_distance_km(lat1, lon1, lat2, lon2):
 def get_real_coordinates(place_name, address):
     """
     GEOCODING VERIFICATION:
-    Queries OpenStreetMap (Nominatim) using fallback strategies to replace hallucinated 
-    coordinates with real physical lat/lng values anywhere in the world.
+    Queries OpenStreetMap (Nominatim) using fallback strategies to replace 
+    hallucinated coordinates with real physical lat/lng values.
     """
     headers = {'User-Agent': 'SpookySheetMapHackathonApp/1.0'}
     
@@ -72,7 +72,7 @@ def get_real_coordinates(place_name, address):
     except Exception:
         pass
 
-    # Strategy 3: Search by Address / City
+    # Strategy 3: Search by Address
     try:
         query = f"{address}"
         url = f"https://nominatim.openstreetmap.org/search?format=json&q={requests.utils.quote(query)}"
@@ -87,8 +87,7 @@ def get_real_coordinates(place_name, address):
 
 def get_place_from_gemma(user_prompt):
     """
-    Formats prompt to calculate ticket breakdowns (Babies £0, Adults full price),
-    estimate venue duration, and retrieve precise coordinates.
+    Formats prompt to calculate ticket breakdowns (e.g. Babies £0, Adults £15) and duration.
     """
     formatted_prompt = f"""
     You are an expert travel planner and spatial routing assistant.
@@ -99,7 +98,7 @@ def get_place_from_gemma(user_prompt):
     2. Extract individual per-person price (per_person_price).
     3. Provide a clear price breakdown string in 'price_breakdown' (e.g., "(£15.00 x 2 Adults + 1 Baby Free)").
     4. Provide the total summed price in 'estimated_cost'.
-    5. Estimate realistic activity duration and output start/end range (e.g. "02:00 PM - 04:30 PM").
+    5. Estimate activity duration and output start/end range (e.g. "02:00 PM - 04:30 PM").
 
     Respond ONLY with valid JSON with NO markdown formatting:
     {{
@@ -110,8 +109,8 @@ def get_place_from_gemma(user_prompt):
         "price_breakdown": "(£15.00 x 2 Adults + 1 Baby Free)",
         "estimated_cost": 30.0,
         "address": "Full real street address, City",
-        "lat": 51.5074,
-        "lng": -0.1278
+        "lat": 36.3932,
+        "lng": 25.4615
     }}
 
     User Request: {user_prompt}
@@ -124,18 +123,17 @@ def get_place_from_gemma(user_prompt):
     except Exception as e:
         print(f"⚠️ JSON Parsing fallback triggered: {e}")
         place_data = {
-            "name": "Local Landmark Attraction",
+            "name": "Akrotiri Archaeological Site",
             "category": "Sightseeing",
             "time": "02:00 PM - 04:30 PM",
             "per_person_price": 15.0,
             "price_breakdown": "(£15.00 x 2 Adults + 1 Baby Free)",
             "estimated_cost": 30.0,
-            "address": user_prompt,
-            "lat": 51.5074,
-            "lng": -0.1278
+            "address": "Akrotiri 847 00, Santorini, Greece",
+            "lat": 36.3514,
+            "lng": 25.4036
         }
 
-    # Cross-reference coordinates with OpenStreetMap
     real_lat, real_lng = get_real_coordinates(place_data.get("name", ""), place_data.get("address", ""))
     if real_lat is not None and real_lng is not None:
         place_data["lat"] = real_lat
