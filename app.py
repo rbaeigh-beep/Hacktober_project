@@ -144,6 +144,7 @@ def home():
 def add_item():
     payload = request.get_json(force=True) or {}
     user_prompt = payload.get("prompt", "")
+    # Default to an empty list [] so no initial default row exists
     existing_matrix = payload.get("current_matrix", [])
 
     if not user_prompt:
