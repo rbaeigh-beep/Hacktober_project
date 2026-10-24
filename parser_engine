@@ -2,7 +2,7 @@ import json
 # Import your exact, untouched function from ai_helper.py
 from ai_helper import ask_gemma
 
-def rasha_parser_pipeline(user_note):
+def parser_pipeline(user_note):
     """
     SECTION 1: THE AI DATA PARSER
     Uses the existing ask_gemma function to extract travel details
