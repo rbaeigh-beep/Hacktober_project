@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SheetMap - Gemma Trip Planner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body class="bg-gray-100 h-screen flex flex-col font-sans">
+
+    <!-- Header & Budget Banner -->
+    <header class="bg-slate-900 text-white p-4 flex justify-between items-center shadow-md">
+        <div>
+            <h1 class="text-2xl font-bold flex items-center gap-2">📊 SheetMap <span class="text-xs bg-emerald-500 px-2 py-0.5 rounded font-mono">Fusion</span></h1>
+            <p class="text-xs text-gray-400">Excel / Maps Smart Synchronizer via Gemma 4</p>
+        </div>
+        <div class="bg-slate-800 px-4 py-2 rounded-lg border border-slate-700 text-right">
+            <span class="text-xs text-gray-400 uppercase tracking-wider block">Total Estimated Cost</span>
+            <span id="total-budget" class="text-2xl font-extrabold text-emerald-400">£12.00</span>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <div class="flex-1 flex overflow-hidden">
+        
+        <!-- Left Pane: Spreadsheet -->
+        <div class="w-1/2 p-4 flex flex-col bg-white border-r border-gray-300">
+            <h2 class="text-sm font-bold text-gray-500 mb-2 uppercase">Trip Itinerary Spreadsheet</h2>
+            
+            <div class="flex-1 overflow-auto border border-gray-200 rounded">
+                <table class="w-full text-left border-collapse text-sm">
+                    <thead class="bg-gray-100 text-gray-700 sticky top-0 border-b">
+                        <tr>
+                            <th class="p-2 border-r">Time</th>
+                            <th class="p-2 border-r">Place</th>
+                            <th class="p-2 border-r">Category</th>
+                            <th class="p-2 border-r">Cost</th>
+                            <th class="p-2">Address</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sheet-body">
+                        <tr class="border-b hover:bg-gray-50">
+                            <td class="p-2 border-r font-mono text-indigo-600 font-bold">12:30 PM</td>
+                            <td class="p-2 border-r font-semibold text-gray-800">The Station Diner</td>
+                            <td class="p-2 border-r text-gray-600">Lunch</td>
+                            <td class="p-2 border-r font-mono">£12.00</td>
+                            <td class="p-2 text-xs text-gray-500">Euston Rd, London NW1 2RT</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Input Bar -->
+            <div class="mt-4 flex gap-2">
+                <input id="prompt-input" type="text" placeholder="e.g. Find an upscale Italian dinner spot under £50 around 07:00 PM" 
+                       class="flex-1 p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+                <button onclick="addItem()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-5 py-3 rounded-lg text-sm transition">
+                    + Add Row
+                </button>
+            </div>
+        </div>
+
+        <!-- Right Pane: Map -->
+        <div class="w-1/2 h-full">
+            <div id="map" class="w-full h-full"></div>
+        </div>
+
+    </div>
+
+    <!-- JavaScript block MUST be wrapped inside <script> tags -->
+    <script>
+        let currentMatrix = [
+            {
+                name: "The Station Diner",
+                category: "Lunch",
+                time: "12:30 PM",
+                estimated_cost: 12.00,
+                address: "Euston Rd, London NW1 2RT",
+                lat: 51.528,
+                lng: -0.133
+            }
+        ];
+
+        // Initialize Map
+        const map = L.map('map').setView([51.528, -0.133], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
+
+        L.marker([51.528, -0.133]).addTo(map).bindPopup("<b>The Station Diner</b><br>12:30 PM - £12.00");
+
+        async function addItem() {
+            const inputField = document.getElementById("prompt-input");
+            const promptText = inputField.value.trim();
+            if (!promptText) return;
+
+            inputField.disabled = true;
+            inputField.value = "⏳ Sorting and organizing itinerary...";
+
+            try {
+                const res = await fetch("/add-item", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ 
+                        prompt: promptText,
+                        current_matrix: currentMatrix 
+                    })
+                });
+
+                const json = await res.json();
+                if (json.success) {
+                    currentMatrix = json.master_matrix;
+                    renderSpreadsheet(currentMatrix);
+
+                    document.getElementById("total-budget").innerText = `£${json.total_budget.toFixed(2)}`;
+
+                    const newItem = json.added_item;
+                    const marker = L.marker([newItem.lat, newItem.lng]).addTo(map);
+                    marker.bindPopup(`<b>${newItem.name}</b><br>${newItem.time} - £${newItem.estimated_cost}`).openPopup();
+                    map.flyTo([newItem.lat, newItem.lng], 14);
+
+                    inputField.value = "";
+                } else {
+                    alert("Error: " + json.error);
+                }
+            } catch (err) {
+                alert("Failed to connect to backend server.");
+            } finally {
+                inputField.disabled = false;
+            }
+        }
+
+        function renderSpreadsheet(matrix) {
+            const tableBody = document.getElementById("sheet-body");
+            tableBody.innerHTML = "";
+
+            matrix.forEach(item => {
+                const row = document.createElement("tr");
+                row.className = "border-b hover:bg-gray-50 transition duration-300";
+                row.innerHTML = `
+                    <td class="p-2 border-r font-mono text-indigo-600 font-bold">${item.time}</td>
+                    <td class="p-2 border-r font-semibold text-gray-800">${item.name}</td>
+                    <td class="p-2 border-r text-gray-600">${item.category}</td>
+                    <td class="p-2 border-r font-mono">£${parseFloat(item.estimated_cost).toFixed(2)}</td>
+                    <td class="p-2 text-xs text-gray-500">${item.address}</td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+    </script>
+</body>
+</html>
